@@ -1,0 +1,8 @@
+-I/workspace/assignments/04-imu-calib/src/imu_tk/./include
+-I/usr/include
+-I/usr/include
+-I/usr/include/eigen3
+-I/workspace/assignments/04-imu-calib/src/imu_tk/build
+-o
+/workspace/assignments/04-imu-calib/src/imu_tk/build/include/imu_tk/vis_extra/moc_opengl_3d_scene.cxx
+/workspace/assignments/04-imu-calib/src/imu_tk/include/imu_tk/vis_extra/opengl_3d_scene.h
