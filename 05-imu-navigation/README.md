@@ -59,7 +59,30 @@
 
 欧拉法：
 
-![结果-欧拉法](doc/images/结果-欧拉法.png)
+![结果-欧拉法](doc/images/oula.png)
 
-精度分析对比：
+精度分析对比：参考第二章的误差评价程序修改而来。
 
+中值法
+
+![med精度对比-raw](doc/images/med精度对比-raw.png)
+
+![med精度对比-map](doc/images/med精度对比-map.png)
+
+![med精度对比-map](doc/images/med精度对比-方差.png)
+
+欧拉法
+
+![ape-oula精度对比-raw](doc/images/ape-oula精度对比-raw.png)
+
+![ape-oula精度对比-map](doc/images/ape-oula精度对比-map.png)
+
+![ape-oula精度对比-raw](doc/images/allen方差数据.png)
+
+### 自己建立仿真数据
+
+![加速参数表](doc/images/加速参数表.png)
+
+结果分析
+
+待更新...

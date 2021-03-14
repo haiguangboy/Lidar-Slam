@@ -8,6 +8,8 @@
 #include "imu_integration/estimator/activity.hpp"
 #include "glog/logging.h"
 
+#include "imu_integration/tools/file_manager.hpp"
+
 namespace imu_integration {
 
 namespace estimator {
@@ -68,36 +70,29 @@ bool Activity::Run(void) {
     while(HasData()) {
         if (UpdatePose()) {
             PublishPose();
+             SaveTrajectoryKitti();
+            //SaveTrajectory();      
         }
     }
 
     return true;
 }
-
 bool Activity::ReadData(void) {
     // fetch IMU measurements into buffer:
     imu_sub_ptr_->ParseData(imu_data_buff_);
-
-    if (static_cast<size_t>(0) == imu_data_buff_.size())
-        return false;
-
-    if (!initialized_) {
-        odom_ground_truth_sub_ptr->ParseData(odom_data_buff_);
-
-        if (static_cast<size_t>(0) == odom_data_buff_.size())
-            return false;
-    }
+    odom_ground_truth_sub_ptr->ParseData(odom_data_buff_);
 
     return true;
 }
-
 bool Activity::HasData(void) {
-    if (imu_data_buff_.size() < static_cast<size_t>(3))
+    if (
+        imu_data_buff_.size() < static_cast<size_t>(2)
+    ){
         return false;
+    }
 
     if (
-        !initialized_ && 
-        static_cast<size_t>(0) == odom_data_buff_.size()
+        odom_data_buff_.size() < static_cast<size_t>(2) 
     ) {
         return false;
     }
@@ -108,12 +103,32 @@ bool Activity::HasData(void) {
 bool Activity::UpdatePose(void) {
     if (!initialized_) {
         // use the latest measurement for initialization:
-        OdomData &odom_data = odom_data_buff_.back();  //back()函数返回最后一个元素的地址
+        
+        static std::deque<OdomData> unsynced_odom_;
+        unsynced_odom_ = odom_data_buff_;
+        if (imu_data_buff_.size() == 0) {
+            return false;
+        }
+        
+        double cloud_time = imu_data_buff_.back().time;
+        bool valid_odom = OdomData::SyncData(unsynced_odom_, odom_data_buff_, cloud_time);
+        static bool sensor_inited = false;
+        if (!sensor_inited) {
+            if (!valid_odom) {
+                LOG(INFO) << "Validity check: " << std::endl
+                        << "odom: " << valid_odom << std::endl;
+                return false;
+            }
+            sensor_inited = true;
+        }        
+        
+        OdomData odom_data = odom_data_buff_.back();
         IMUData imu_data = imu_data_buff_.back();
-
+        
         pose_ = odom_data.pose;
         vel_ = odom_data.vel;
-
+        init_time_ = odom_data.time;
+        
         initialized_ = true;
 
         odom_data_buff_.clear();
@@ -121,36 +136,69 @@ bool Activity::UpdatePose(void) {
 
         // keep the latest IMU measurement for mid-value integration:
         imu_data_buff_.push_back(imu_data);
+        odom_data_buff_.push_back(odom_data);
+        
+
     } else {
-        //
+       //
         // TODO: implement your estimation here
         //
+
         // get deltas:
-        const size_t index_curr = 1;
+        IMUData imu_data = imu_data_buff_.back();
+        const size_t index_curr = imu_data_buff_.size()-1;
         const size_t index_prev = 0;
         Eigen::Vector3d angular_delta;
-        Eigen::Matrix3d R_curr;
-       Eigen::Matrix3d R_prev;
-        Eigen::Vector3d velocity_delta;
-        double delta_t;
-
-
-        GetAngularDelta( index_curr, index_prev,angular_delta);
+        
+        if (
+            !GetAngularDelta(
+//             !GetAngularDeltaEuler(
+                index_curr, 
+                index_prev,
+                angular_delta
+            )
+        ){
+            return false;
+        }
 
         // update orientation:
+        Eigen::Matrix3d R_curr, R_prev;
+        
+        UpdateOrientation(
+            angular_delta,
+            R_curr,
+            R_prev
+        );       
 
         // get velocity delta:
-        GetVelocityDelta( index_curr, index_prev,R_curr, R_prev, delta_t, velocity_delta);
-
-         UpdateOrientation(angular_delta,R_curr, R_prev);
-
-        // update position:
-        UpdatePosition(delta_t,velocity_delta );
-
-        // move forward -- 
+        double delta_t;
+        Eigen::Vector3d velocity_delta;
         
-        // NOTE: this is NOT fixed. you should update your buffer according to the method of your choice:
-        imu_data_buff_.pop_front();
+        if( 
+            !GetVelocityDelta(
+//             !GetVelocityDeltaEuler(
+                index_curr,
+                index_prev,
+                R_curr,
+                R_prev,
+                delta_t,
+                velocity_delta
+            )
+        ){
+            return false;
+        }
+
+        
+        // update position:
+        UpdatePosition(delta_t, velocity_delta);        
+               
+        // move forward -- 
+        imu_data_buff_.clear();
+        imu_data_buff_.push_back(imu_data);
+        
+        OdomData odom_data = odom_data_buff_.back();
+        odom_data_buff_.clear();
+        odom_data_buff_.push_back(odom_data);
     }
     
     return true;
@@ -223,16 +271,6 @@ bool Activity::GetAngularDelta(
     //
     // TODO: this could be a helper routine for your own implementation
     //
-    /*
-    if( index_curr  >  index_prev  ||  imu_data_buff_.size() > index_curr
-
-       
-    ){
-        //中值法
-        angular_delta= 0.5 * (angular_vel_curr  + angular_vel_prev) * delta_t;  
-         return  ture;
-    }
-    */
     if (
         index_curr <= index_prev ||
         imu_data_buff_.size() <= index_curr
@@ -247,11 +285,10 @@ bool Activity::GetAngularDelta(
 
     Eigen::Vector3d angular_vel_curr = GetUnbiasedAngularVel(imu_data_curr.angular_velocity);
     Eigen::Vector3d angular_vel_prev = GetUnbiasedAngularVel(imu_data_prev.angular_velocity);
-// 基于中值法
-   // angular_delta = 0.5*delta_t*(angular_vel_curr + angular_vel_prev);
-    //基于欧拉法
-      angular_delta = delta_t*angular_vel_prev;
 
+    angular_delta = 0.5*delta_t*(angular_vel_curr + angular_vel_prev);
+//基于欧拉法
+     // angular_delta = delta_t*angular_vel_prev;
     return true;
 }
 
@@ -288,9 +325,12 @@ bool Activity::GetVelocityDelta(
     Eigen::Vector3d linear_acc_prev = GetUnbiasedLinearAcc(imu_data_prev.linear_acceleration, R_prev);
     
     velocity_delta = 0.5*delta_t*(linear_acc_curr + linear_acc_prev);
+    //基于欧拉法
+    // velocity_delta = delta_t*linear_acc_prev;
 
     return true;
 }
+
 
 /**
  * @brief  update orientation with effective rotation angular_delta
@@ -345,6 +385,84 @@ void Activity::UpdatePosition(const double &delta_t, const Eigen::Vector3d &velo
     vel_ += velocity_delta;
 }
 
+bool Activity::SaveTrajectoryKitti() {
+    static std::ofstream ground_truth, laser_odom;
+    static bool is_file_created = false;
+    std::string WORK_SPACE_PATH="/workspace/assignments/05-imu-navigation/src/imu_integration";
+    
+    if (!is_file_created) {
+        if (!FileManager::CreateDirectory(WORK_SPACE_PATH + "/slam_data/trajectory"))
+            return false;
+        if (!FileManager::CreateFile(ground_truth, WORK_SPACE_PATH + "/slam_data/trajectory/ground_truth.txt"))
+            return false;
+        if (!FileManager::CreateFile(laser_odom, WORK_SPACE_PATH + "/slam_data/trajectory/laser_odom.txt"))
+            return false;
+        is_file_created = true;
+    }
+    
+    Eigen::Matrix4d truth_pose_ = odom_data_buff_.back().pose;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            ground_truth << truth_pose_(i, j);
+            laser_odom << pose_(i, j);
+            if (i == 2 && j == 3) {
+                ground_truth << std::endl;
+                laser_odom << std::endl;
+            } else {
+                ground_truth << " ";
+                laser_odom << " ";
+            }
+        }
+    }
+
+    return true;
+}
+
+/*
+bool Activity::SaveTrajectory() {
+    static std::ofstream ground_truth, laser_odom;
+    static bool is_file_created = false;
+    std::string WORK_SPACE_PATH="/workspace/assignments/05-imu-navigation/src/imu_integration";
+    
+    if (!is_file_created) {
+        if (!FileManager::CreateDirectory(WORK_SPACE_PATH + "/slam_data/trajectory"))
+            return false;
+        if (!FileManager::CreateFile(ground_truth, WORK_SPACE_PATH + "/slam_data/trajectory/ground_truth.txt"))
+            return false;
+        if (!FileManager::CreateFile(laser_odom, WORK_SPACE_PATH + "/slam_data/trajectory/laser_odom.txt"))
+            return false;
+        is_file_created = true;
+    }
+    
+    Eigen::Matrix4d odom_pose = odom_data_buff_.back().pose;
+    Eigen::Quaterniond odom_q ( odom_pose.block<3,3>(0,0) );
+    double odom_time = odom_data_buff_.back().time - init_time_;
+    ground_truth << odom_time << " "
+                 << odom_pose(0,3) << " "
+                 << odom_pose(1,3) << " "
+                 << odom_pose(2,3) << " "
+                 << odom_q.x() << " "
+                 << odom_q.y() << " "
+                 << odom_q.z() << " "
+                 << odom_q.w() << std::endl;
+                 
+ 
+    Eigen::Matrix4d imu_pose = pose_;
+    Eigen::Quaterniond imu_q ( imu_pose.block<3,3>(0,0) );
+    double imu_time = imu_data_buff_.back().time - init_time_;
+    laser_odom << imu_time << " "
+                 << imu_pose(0,3) << " "
+                 << imu_pose(1,3) << " "
+                 << imu_pose(2,3) << " "
+                 << imu_q.x() << " "
+                 << imu_q.y() << " "
+                 << imu_q.z() << " "
+                 << imu_q.w() << std::endl;
+                                  
+
+    return true;
+}
+*/
 
 } // namespace estimator
 

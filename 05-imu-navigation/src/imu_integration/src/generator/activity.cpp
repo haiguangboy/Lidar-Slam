@@ -266,42 +266,6 @@ Eigen::Vector3d Activity::EulerAngleRatesToBodyAngleRates(
     return R * euler_angle_rates;
 }
 
-bool Activity::SaveTrajectory() {
-    static std::ofstream ground_truth, laser_odom;
-    static bool is_file_created = false;
-
-    if (!is_file_created) {
-        if (!FileManager::CreateDirectory(WORK_SPACE_PATH + "/slam_data/trajectory"))
-            return false;
-        if (!FileManager::CreateFile(ground_truth, WORK_SPACE_PATH + "/slam_data/trajectory/ground_truth.txt"))
-            return false;
-        if (!FileManager::CreateFile(laser_odom, WORK_SPACE_PATH + "/slam_data/trajectory/laser_odom.txt"))
-            return false;
-        is_file_created = true;
-    }
-
-      // a. angular velocity:
-   // angular_vel_ = EulerAngleRatesToBodyAngleRates(euler_angles, euler_angle_rates);
-    // b. linear acceleration:
-  //  linear_acc_ = R_gt_.transpose() * (a + G_);
-
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            ground_truth <<angular_vel_(i, j),  linear_acc_(i, j);;
-             //linear_acc_ << linear_acc_(i, j);
-            if (i == 2 && j == 3) {
-                ground_truth << std::endl;
-               //linear_acc_ << std::endl;
-            } else {
-                ground_truth << " ";
-               // laser_odom << " ";
-            }
-        }
-    }
-
-    return true;
-}
-
 }  // namespace generator
 
 }  // namespace imu_integration

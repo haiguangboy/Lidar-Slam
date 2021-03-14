@@ -137,7 +137,7 @@ include_directories(
 )
 
 ## Utils
-file(GLOB_RECURSE UTILS_SRCS "src/subscriber/*.cpp")
+file(GLOB_RECURSE UTILS_SRCS "src/subscriber/*.cpp" "src/tools/*.cpp")
 add_library(utils
   ${UTILS_SRCS}
 )

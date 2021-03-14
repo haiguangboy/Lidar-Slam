@@ -36,6 +36,8 @@ class Activity {
     bool HasData(void);
     bool UpdatePose(void);
     bool PublishPose(void);
+    bool SaveTrajectoryKitti();
+    bool SaveTrajectory();
 
     // utils:
     /**
@@ -65,6 +67,8 @@ class Activity {
         const size_t index_curr, const size_t index_prev,
         Eigen::Vector3d &angular_delta
     );
+
+    
     /**
      * @brief  get velocity delta
      * @param  index_curr, current imu measurement buffer index
@@ -78,7 +82,6 @@ class Activity {
         const size_t index_curr, const size_t index_prev,
         const Eigen::Matrix3d &R_curr, const Eigen::Matrix3d &R_prev, 
         double &delta_t, Eigen::Vector3d &velocity_delta
-    );
     /**
      * @brief  update orientation with effective rotation angular_delta
      * @param  angular_delta, effective rotation
@@ -86,6 +89,7 @@ class Activity {
      * @param  R_prev, previous orientation
      * @return void
      */
+    );
     void UpdateOrientation(
         const Eigen::Vector3d &angular_delta,
         Eigen::Matrix3d &R_curr, Eigen::Matrix3d &R_prev
@@ -126,8 +130,10 @@ class Activity {
     // IMU pose estimation:
     Eigen::Matrix4d pose_ = Eigen::Matrix4d::Identity();
     Eigen::Vector3d vel_ = Eigen::Vector3d::Zero();
-
+    
     nav_msgs::Odometry message_odom_;
+    
+    double init_time_;
 };
 
 } // namespace estimator

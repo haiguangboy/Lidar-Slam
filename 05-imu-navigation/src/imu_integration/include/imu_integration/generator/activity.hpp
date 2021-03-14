@@ -39,7 +39,6 @@ private:
     void SetOdometryMessage(void);
     // publish:
     void PublishMessages(void);
-    bool SaveTrajectory() ;
 
     // utilities:
     Eigen::Vector3d GetGaussianNoise(double stddev);
@@ -79,7 +78,6 @@ private:
     sensor_msgs::Imu message_imu_;
     nav_msgs::Odometry message_odom_;
 };
-
 
 }  // namespace generator
 
