@@ -18,6 +18,14 @@
 
 ---
 
+**参考资料：**
+
+论文《On-Manifold Preintegration for Real-TimeVisual-Inertial Odometry》
+
+VINS-Mono,使https://github.com/HKUST-Aerial-Robotics/VINS-Mono
+
+---
+
 ### 没有IMU
 
 此时，优化前后的结果相同，这里主要是用于后续对比。
