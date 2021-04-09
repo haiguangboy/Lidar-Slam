@@ -17,11 +17,12 @@
 #include <g2o/types/slam3d_addons/types_slam3d_addons.h>
 
 #include "lidar_localization/models/graph_optimizer/g2o/vertex/vertex_prvag.hpp"
-#include "lidar_localization/models/graph_optimizer/g2o/utility/utility.h"
 
 #include <g2o/core/base_binary_edge.h>
 
 #include "glog/logging.h"
+
+#include "../utility/utility.h"
 
 typedef Eigen::Matrix<double, 15, 1> Vector15d;
 
@@ -64,12 +65,13 @@ public:
 			Eigen::Vector3d d_b_a_i, d_b_g_i;
 			v0->getDeltaBiases( d_b_a_i, d_b_g_i );
 			updateMeasurement( d_b_a_i, d_b_g_i );
-
+		}
 		//
 		// TODO: compute error:
 		//
+		
 		_error.block<3, 1>(INDEX_P, 0) = ori_i.inverse() * (pos_j -pos_i - vel_i*T_ + 0.5*g_*T_*T_) - _measurement.block<3, 1>(INDEX_P, 0);
-		_error.block<3, 1>(INDEX_R, 0) = ( Sophus::SO3d::exp( _measurement.block<3, 1>(INDEX_R, 0) ).inverse() * ori_i.inverse() *ori_j ).log();
+		_error.block<3, 1>(INDEX_R, 0) =2* ( Sophus::SO3d::exp( _measurement.block<3, 1>(INDEX_R, 0) ).inverse() * ori_i.inverse() *ori_j ).log();
 		_error.block<3, 1>(INDEX_V, 0) = ori_i.inverse() * (vel_j - vel_i + g_*T_) - _measurement.block<3, 1>(INDEX_V, 0);
 		_error.block<3, 1>(INDEX_A, 0) = b_a_j - b_a_i;
 		_error.block<3, 1>(INDEX_G, 0) = b_g_j - b_g_i;
@@ -109,9 +111,8 @@ public:
 		const Eigen::Vector3d dp = _measurement.block<3, 1>(INDEX_P, 0);
 		const Sophus::SO3d	dr = Sophus::SO3d::exp( _measurement.block<3, 1>(INDEX_R, 0) );
 		const Eigen::Vector3d dv = _measurement.block<3, 1>(INDEX_V, 0);
-		const Sophus::SO3d	res_r = dr.inverse() * ri_inv  *rj;
 
-		Eigen::Quaterniond corrected_delta_q( dr.matrix() );
+		Eigen::Quaterniond dr_m( dr.matrix() );
 
 		// w.r.t i
 		_jacobianOplusXi = Eigen::Matrix<double, 15, 15>::Zero();
@@ -128,12 +129,10 @@ public:
 		_jacobianOplusXi.block<3,3>(INDEX_P,INDEX_G) = -dp_dbg_;
 
 		// dr/dr
-		//_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_R) = -Sophus::SO3d::JacobianRInv(res_r.log()) * (rj_inv * ri).matrix();
-		_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_R) =  -(Utility::Qleft(Qj.inverse() * Qi) * Utility::Qright(corrected_delta_q)).bottomRightCorner<3, 3>();
+		_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_R) =  -2*(Utility::Qleft(Qj.inverse() * Qi) * Utility::Qright(dr_m)).bottomRightCorner<3, 3>();
 
 		// dr/dbg
-		//_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_G) = -Sophus::SO3d::JacobianRInv(res_r.log()) * dr.inverse().matrix() * dr_dbg_;
-		_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_G) = -Utility::Qleft(Qj.inverse() * Qi * corrected_delta_q).bottomRightCorner<3, 3>() * dr_dbg_;
+		_jacobianOplusXi.block<3,3>(INDEX_R,INDEX_G) = -Utility::Qleft(Qj.inverse() * Qi * dr_m).bottomRightCorner<3, 3>() * dr_dbg_;
 
 		// dv/dr
 		_jacobianOplusXi.block<3,3>(INDEX_V,INDEX_R) = Sophus::SO3d::hat(ri_inv * (gravity_ * dt + vj - vi));
@@ -156,8 +155,8 @@ public:
 		_jacobianOplusXj.block<3,3>(INDEX_P,INDEX_P) = ri_inv.matrix();
 
 		// dr/dr
-		//_jacobianOplusXj.block<3,3>(INDEX_R,INDEX_R) = Sophus::SO3d::JacobianRInv(res_r.log());
-		_jacobianOplusXj.block<3,3>(INDEX_R,INDEX_R) = Utility::Qleft(corrected_delta_q.inverse() * Qi.inverse() * Qj).bottomRightCorner<3, 3>();
+		
+		_jacobianOplusXj.block<3,3>(INDEX_R,INDEX_R) = Utility::Qleft(dr_m.inverse() * Qi.inverse() * Qj).bottomRightCorner<3, 3>();
 
 		// dv/dv
 		_jacobianOplusXj.block<3,3>(INDEX_V,INDEX_V) = ri_inv.matrix();

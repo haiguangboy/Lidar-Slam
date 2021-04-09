@@ -273,7 +273,7 @@ void IMUPreIntegrator::UpdateState(void) {
     F_.block<3, 3>(INDEX_BETA,   INDEX_B_A) =  -0.5*T*( prev_R + curr_R );
     F_.block<3, 3>(INDEX_BETA,   INDEX_B_G) = 0.5*T*T*curr_R_a_hat;
 
-    MatrixF F = Eigen::Matrix<double, DIM_STATE, DIM_STATE>::Identity() + F_;
+    MatrixF F = Eigen::Matrix<double, DIM_STATE, DIM_STATE>::Identity() +T* F_;
 
     //
     // TODO: 3. set up G:
@@ -294,7 +294,7 @@ void IMUPreIntegrator::UpdateState(void) {
     //G45 & G56
     B_.block<3, 3>(INDEX_B_A, INDEX_R_ACC_PREV) = B_.block<3, 3>(INDEX_B_G, INDEX_R_GYR_PREV) = T * Eigen::Matrix3d::Identity();
 
-    MatrixB B = B_;
+    MatrixB B =T * B_;
 
     // TODO: 4. update P_:
     P_ = F * P_ * F.transpose() + B * Q_ *B.transpose();

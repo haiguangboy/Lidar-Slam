@@ -185,7 +185,7 @@ void OdoPreIntegrator::UpdateState(void) {
     curr_theta_ij = state.theta_ij_;
     // 3. get v_mid:
     v_mid = 0.5 * ( prev_theta_ij * prev_v + curr_theta_ij * curr_v );
-    // 4. update relative velocity: 
+    // 4. update relative velocity:
     state.alpha_ij_ += v_mid * T;
 
     //

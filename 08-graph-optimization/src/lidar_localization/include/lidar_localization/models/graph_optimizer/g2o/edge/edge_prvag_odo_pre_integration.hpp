@@ -17,7 +17,6 @@
 #include <g2o/types/slam3d_addons/types_slam3d_addons.h>
 
 #include "lidar_localization/models/graph_optimizer/g2o/vertex/vertex_prvag.hpp"
-#include "lidar_localization/models/graph_optimizer/g2o/utility/utility.h"
 
 #include <g2o/core/base_binary_edge.h>
 

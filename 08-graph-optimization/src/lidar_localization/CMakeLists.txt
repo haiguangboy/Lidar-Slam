@@ -67,7 +67,6 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 include(cmake/global_defination.cmake)
 catkin_package()
 
-
 file(GLOB_RECURSE ALL_SRCS "*.cpp")
 file(GLOB_RECURSE NODE_SRCS "src/apps/*_node.cpp")
 list(REMOVE_ITEM ALL_SRCS ${NODE_SRCS})
